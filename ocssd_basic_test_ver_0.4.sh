@@ -63,7 +63,6 @@ nvm_vblk_addr_read()
 	fi
 }
 
-
 # first arg is expected val of chunk state, 2nd arg is expected value of wp
 nvm_verify_all_cs_wp()
 {
@@ -75,8 +74,8 @@ nvm_verify_all_cs_wp()
         cs=`echo "$line" | gawk '/cs:/ {print $10}' | gawk -F '[,]' '{print $1}'`
         if [ $1 != $cs -o $2 -ne $wp ];
         then
-            echo "Failure: Unexpected write pointer or chunkstate found, exiting."
             echo "Slba = $slba, Expected CS=$1, Reported CS=$cs Expected WP:$2, Reported WP=$wp "
+            echo "Failure: Unexpected write pointer or chunkstate found, exiting."
         fi
     done
     echo -e "\nVerified all chunk state to be $1 and write pointers to be $2 \n"
@@ -87,7 +86,7 @@ nvm_verify_all_cs_wp()
 #Erase all the chunks in SSD
 nvm_erase_and_verify_all_chunks()
 {
-    echo -e "\nStarting erase of all chunks in the device: $mydev_path  "
+    echo -e "\nStarting erase of all chunks in the device: $mydev_path  \n"
     echo -e "pugrp=\t\t\t$dev_npugrp, \nnpunit=\t\t\t$dev_npunit, \nnchunks=\t\t$dev_nchunk, \nnsectors=\t\t$dev_nsectr"
     echo -e "bytespersector=\t\t$dev_nbytespersectr, \noob=\t\t\t$dev_nbytes_oob, \ntotal bytes=\t\t$dev_total_bytes, \ntotal mbytes=\t\t$dev_total_mbytes"
 
@@ -164,9 +163,56 @@ nvm_write_read_all_chunks()
     echo -e "\nWrite and read on all chunks complete \n"
 
 }
+nvm_partial_chunk_write_and_verify_cs_wp()
+{
+    echo -e "\n Doing partial writes to all chunks to verify cs and wp. \n "
+    # Do partial writes to all chunks in SSD (write to first sectors of all chunks). 
+    # verify that cs is free before writing and open after writing 
+    local count=1
+
+    for (( i=0; i<$dev_npugrp; i++ ))
+    do
+        for (( j=0; j<$dev_npunit; j++ ))
+        do
+            #for (( k=0; k<$dev_nchunk; k++ ))
+            for (( k=0; k<$dev_nchunk; k++ ))
+            do
+                #echo  "Chunk start address: $chunk_saddr"
+                # Generate sector start address
+                sector_saddr=`sudo ./nvm_addr s20_to_gen $mydev_path $i $j $k 0 | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
+                local s_addr=$s_addr" $sector_saddr"
+                #echo -e "sector address = $s_addr count = $count"
+                if [ $count -eq 32 ];
+                then
+                    run_command "sudo ./nvm_cmd write $mydev_path $s_addr"
+                    count=0
+                    #run_command "sudo ./nvm_cmd read $mydev_path $s_addr"
+                    s_addr=""
+                fi
+                #$count=$count + 1
+                ((count++))
 
 
-nvm_erase_write_read_all_sectors()
+                #run_command "sudo ./nvm_cmd write $mydev_path $chunk_saddr"
+
+                #echo in loop i=$i, j=$j, k=$k, l=$l
+            done
+            
+            if [ $count -ne 0 -a $count -le 32 ];
+            then
+                echo "XXXXXXXXXXXXXXXXXXXXXX count = $count"
+                run_command "sudo ./nvm_cmd write $mydev_path $s_addr"
+                count=0
+                s_addr=""
+            fi
+
+        done
+    done
+    nvm_verify_all_cs_wp 0x04 1  
+
+}
+
+nvm_write_read_all_sectors()
 {
 
     echo -e "\nStarting writes and reads on all sectors \n"
@@ -184,12 +230,12 @@ nvm_erase_write_read_all_sectors()
     #echo -e "bytespersector=\t\t$dev_nbytespersectr, \noob=\t\t\t$dev_nbytes_oob, \ntotal bytes=\t\t$dev_total_bytes, \ntotal mbytes=\t\t$dev_total_mbytes"
     local count=1
 
-    for (( i=0; i<$dev_npugrp; i++))
+    for (( i=0; i<$dev_npugrp; i++ ))
     do
         for (( j=0; j<$dev_npunit; j++ ))
         do
             #for (( k=0; k<$dev_nchunk; k++ ))
-            for (( k=0; k<5; k++ ))
+            for (( k=0; k<$dev_nchunk; k++ ))
             do
                 #echo  "Chunk start address: $chunk_saddr"
                 # Sector level ops
@@ -197,14 +243,13 @@ nvm_erase_write_read_all_sectors()
                 do
                     # Generate sector start address
                     sector_saddr=`sudo ./nvm_addr s20_to_gen $mydev_path $i $j $k $l | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
-                    echo "i = $i, j = $j, k=$k, l=$l"
-
                     local s_addr=$s_addr" $sector_saddr"
                     #echo -e "sector address = $s_addr count = $count"
-                    if [ $count -eq 4 ];
+                    if [ $count -eq 32 ]; #TODO: Ensure nsector is multiple of 8
                     then
                         run_command "sudo ./nvm_cmd write $mydev_path $s_addr"
                         count=0
+                        run_command "sudo ./nvm_cmd read $mydev_path $s_addr"
                         s_addr=""
                     fi
                     #$count=$count + 1
@@ -221,6 +266,7 @@ nvm_erase_write_read_all_sectors()
 
 
     echo -e "\n Writes and reads on all sectors completed. \n"
+    nvm_verify_all_cs_wp 0x02 4096
 }
 get_dev_geo_var()
 {
@@ -246,7 +292,7 @@ sleep 2
 if [ $# -ne 1 ]; then
 	usage
 fi
-echo "Creating a file of size 4K"
+echo "Creating a file of size 4K" > ./tmp.log
 
 create_4k_file
 
@@ -284,8 +330,11 @@ dev_info=`sudo ./nvm_dev info $mydev_path`
 #echo Stored attributes in dev_geo = $dev_geo
 get_dev_geo_var
 nvm_erase_and_verify_all_chunks
-#nvm_write_read_all_chunks
-nvm_erase_write_read_all_sectors
+nvm_write_read_all_chunks
+nvm_erase_and_verify_all_chunks
+nvm_write_read_all_sectors
+nvm_erase_and_verify_all_chunks
+nvm_partial_chunk_write_and_verify_cs_wp
 
 # Delete the git repository.
 # cd ../../../..
