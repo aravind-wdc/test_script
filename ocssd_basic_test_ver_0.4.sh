@@ -12,16 +12,16 @@ usage()
 # Run a command to ensure command succeeds
 run_command()
 {
-	echo "Running command $1"
+	echo "Running command $1" >> ./tmp.log
 	$1 >> ./tmp.log
 	ret_val=$?
 	#if $1
 	if [ $ret_val -eq 0 ];
 	then
-		echo -e "\t\nSuccess\n"
+		echo -e "\t\nSuccess\n" >> ./tmp.log
 	else
 		# Want to exit the test ?
-		echo Command failed with error code $?
+		echo Command $1 failed with error code $?
         echo Exiting
         exit 1
 	fi
@@ -30,8 +30,8 @@ run_command()
 # First arg is dev path, 2 nd arg is address in 0xaddr format
 nvm_vblk_addr_erase()
 {
-#    echo Erasing block $2 on device $1
-	sudo ./nvm_vblk erase $1 $2 >> tmp.log
+    echo Erasing block $2 on device $1 >> ./tmp.log
+	sudo ./nvm_vblk erase $1 $2 >> ./tmp.log
 	ret_val=$?
 	if [ $ret_val -ne 0 ];
 	then
@@ -42,8 +42,8 @@ nvm_vblk_addr_erase()
 # First arg is dev path, 2 nd arg is address in 0xaddr format
 nvm_vblk_addr_write()
 {
-    echo Writing block $2 on device $1
-	sudo ./nvm_vblk write $1 $2 >> tmp.log
+    echo Writing block $2 on device $1 >> ./tmp.log
+	sudo ./nvm_vblk write $1 $2 >> ./tmp.log
 	ret_val=$?
 	if [ $ret_val -ne 0 ];
 	then
@@ -54,8 +54,8 @@ nvm_vblk_addr_write()
 # First arg is dev path, 2 nd arg is address in 0xaddr format
 nvm_vblk_addr_read()
 {
-#    echo Reading block $2 on device $1
-	sudo ./nvm_vblk read $1 $2 >> tmp.log
+    echo Reading block $2 on device $1 >> ./tmp.log
+	sudo ./nvm_vblk read $1 $2 >> ./tmp.log
 	ret_val=$?
 	if [ $ret_val -ne 0 ];
 	then
@@ -159,28 +159,28 @@ nvm_write_read_all_chunks()
             #TODO Check chunk state here.
         done
     done
+    echo -e "\n Writes and reads on all chunks completed. Verify CS=CLOSED(0x02) and WP=4096. \n"
     nvm_verify_all_cs_wp 0x02 4096
-    echo -e "\nWrite and read on all chunks complete \n"
 
 }
 nvm_partial_chunk_write_and_verify_cs_wp()
 {
-    echo -e "\n Doing partial writes to all chunks to verify cs and wp. \n "
+    echo -e "\nDoing partial writes to all chunks and verify cs and wp. \n "
     # Do partial writes to all chunks in SSD (write to first sectors of all chunks). 
     # verify that cs is free before writing and open after writing 
-    local count=1
+    local count=0
 
     for (( i=0; i<$dev_npugrp; i++ ))
     do
         for (( j=0; j<$dev_npunit; j++ ))
         do
-            #for (( k=0; k<$dev_nchunk; k++ ))
             for (( k=0; k<$dev_nchunk; k++ ))
             do
                 #echo  "Chunk start address: $chunk_saddr"
                 # Generate sector start address
                 sector_saddr=`sudo ./nvm_addr s20_to_gen $mydev_path $i $j $k 0 | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
                 local s_addr=$s_addr" $sector_saddr"
+                ((count++))
                 #echo -e "sector address = $s_addr count = $count"
                 if [ $count -eq 32 ];
                 then
@@ -190,7 +190,6 @@ nvm_partial_chunk_write_and_verify_cs_wp()
                     s_addr=""
                 fi
                 #$count=$count + 1
-                ((count++))
 
 
                 #run_command "sudo ./nvm_cmd write $mydev_path $chunk_saddr"
@@ -198,9 +197,8 @@ nvm_partial_chunk_write_and_verify_cs_wp()
                 #echo in loop i=$i, j=$j, k=$k, l=$l
             done
             
-            if [ $count -ne 0 -a $count -le 32 ];
+            if [ $count -gt 0 -a $count -lt 32 ];
             then
-                echo "XXXXXXXXXXXXXXXXXXXXXX count = $count"
                 run_command "sudo ./nvm_cmd write $mydev_path $s_addr"
                 count=0
                 s_addr=""
@@ -208,6 +206,7 @@ nvm_partial_chunk_write_and_verify_cs_wp()
 
         done
     done
+    echo -e "\nPartial Writes on all sectors completed. \nVerify CS=OPEN(0x04) and WP=1. \n"
     nvm_verify_all_cs_wp 0x04 1  
 
 }
@@ -228,7 +227,7 @@ nvm_write_read_all_sectors()
     #echo Device geometry: 
     #echo -e "pugrp=\t\t\t$dev_npugrp, \nnpunit=\t\t\t$dev_npunit, \nnchunks=\t\t$dev_nchunk, \nnsectors=\t\t$dev_nsectr"
     #echo -e "bytespersector=\t\t$dev_nbytespersectr, \noob=\t\t\t$dev_nbytes_oob, \ntotal bytes=\t\t$dev_total_bytes, \ntotal mbytes=\t\t$dev_total_mbytes"
-    local count=1
+    local count=0
 
     for (( i=0; i<$dev_npugrp; i++ ))
     do
@@ -244,6 +243,7 @@ nvm_write_read_all_sectors()
                     # Generate sector start address
                     sector_saddr=`sudo ./nvm_addr s20_to_gen $mydev_path $i $j $k $l | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
                     local s_addr=$s_addr" $sector_saddr"
+                    ((count++))
                     #echo -e "sector address = $s_addr count = $count"
                     if [ $count -eq 32 ]; #TODO: Ensure nsector is multiple of 8
                     then
@@ -252,23 +252,24 @@ nvm_write_read_all_sectors()
                         run_command "sudo ./nvm_cmd read $mydev_path $s_addr"
                         s_addr=""
                     fi
-                    #$count=$count + 1
-                    ((count++))
-
-
                     #run_command "sudo ./nvm_cmd write $mydev_path $chunk_saddr"
-
                     #echo in loop i=$i, j=$j, k=$k, l=$l
                 done
+                # Do the writes/reads to the remaining sectors (nsects%32)
+                if [ $count -gt 0 -a $count -lt 32 ];
+                then
+                    run_command "sudo ./nvm_cmd write $mydev_path $s_addr"
+                    count=0
+                    run_command "sudo ./nvm_cmd read $mydev_path $s_addr"
+                    s_addr=""
+                fi
             done
         done
     done
-
-
-    echo -e "\n Writes and reads on all sectors completed. \n"
+    echo -e "\n Writes and reads on all sectors completed. Verify CS=CLOSED(0x02) and WP=4096. \n"
     nvm_verify_all_cs_wp 0x02 4096
 }
-get_dev_geo_var()
+get_dev_geo()
 {
 
     dev_npugrp=`sudo ./nvm_dev info $mydev_path | gawk '/npugrp:/ {print $2}'`
@@ -328,11 +329,11 @@ run_command "sudo ./nvm_dev info $mydev_path"
 dev_info=`sudo ./nvm_dev info $mydev_path`
 
 #echo Stored attributes in dev_geo = $dev_geo
-get_dev_geo_var
+get_dev_geo
 nvm_erase_and_verify_all_chunks
 nvm_write_read_all_chunks
-nvm_erase_and_verify_all_chunks
-nvm_write_read_all_sectors
+#nvm_erase_and_verify_all_chunks
+#nvm_write_read_all_sectors
 nvm_erase_and_verify_all_chunks
 nvm_partial_chunk_write_and_verify_cs_wp
 
