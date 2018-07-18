@@ -12,13 +12,13 @@ usage()
 # Run a command to ensure command succeeds
 run_command()
 {
-	echo "Running command $1" >> ./tmp.log
-	$1 >> ./tmp.log
+	echo "Running command $1" >> ./logs/ocssd_sanity.log
+	$1 >> ./logs/ocssd_sanity.log
 	ret_val=$?
 	#if $1
 	if [ $ret_val -eq 0 ];
 	then
-		echo -e "\t\nSuccess\n" >> ./tmp.log
+		echo -e "\t\nSuccess\n" >> ./logs/ocssd_sanity.log
 	else
 		# Want to exit the test ?
 		echo Command $1 failed with error code $?
@@ -30,8 +30,8 @@ run_command()
 # First arg is dev path, 2 nd arg is address in 0xaddr format
 nvm_vblk_addr_erase()
 {
-    echo Erasing block $2 on device $1 >> ./tmp.log
-	sudo ./nvm_vblk erase $1 $2 >> ./tmp.log
+    echo Erasing block $2 on device $1 >> ./logs/ocssd_sanity.log
+	sudo ./nvm_vblk erase $1 $2 >> ./logs/ocssd_sanity.log
 	ret_val=$?
 	if [ $ret_val -ne 0 ];
 	then
@@ -42,8 +42,8 @@ nvm_vblk_addr_erase()
 # First arg is dev path, 2 nd arg is address in 0xaddr format
 nvm_vblk_addr_write()
 {
-    echo Writing block $2 on device $1 >> ./tmp.log
-	sudo ./nvm_vblk write $1 $2 >> ./tmp.log
+    echo Writing block $2 on device $1 >> ./logs/ocssd_sanity.log
+	sudo ./nvm_vblk write $1 $2 >> ./logs/ocssd_sanity.log
 	ret_val=$?
 	if [ $ret_val -ne 0 ];
 	then
@@ -54,8 +54,8 @@ nvm_vblk_addr_write()
 # First arg is dev path, 2 nd arg is address in 0xaddr format
 nvm_vblk_addr_read()
 {
-    echo Reading block $2 on device $1 >> ./tmp.log
-	sudo ./nvm_vblk read $1 $2 >> ./tmp.log
+    echo Reading block $2 on device $1 >> ./logs/ocssd_sanity.log
+	sudo ./nvm_vblk read $1 $2 >> ./logs/ocssd_sanity.log
 	ret_val=$?
 	if [ $ret_val -ne 0 ];
 	then
@@ -117,22 +117,9 @@ create_4k_file()
     done
 }
 
-nvm_write_read_all_chunks()
+nvm_write_verify_all_chunks()
 {
     echo -e "\nStarting writes and reads to all the chunks in device $mydev_path \n"
-    #mydev_path=$1
-    #dev_npugrp=`sudo ./nvm_dev info $mydev_path | gawk '/npugrp:/ {print $2}'`
-    #dev_npunit=`sudo ./nvm_dev info $mydev_path | gawk '/npunit:/ {print $2}'`
-    #dev_nchunk=`sudo ./nvm_dev info $mydev_path | gawk '/nchunk:/ {print $2}'`
-    #dev_nsectr=`sudo ./nvm_dev info $mydev_path | gawk '/nsectr:/ {print $2}'`
-    #dev_nbytespersectr=`sudo ./nvm_dev info $mydev_path | gawk '/nbytes:/ {print $2}'`
-    #dev_nbytes_oob=`sudo ./nvm_dev info $mydev_path | gawk '/nbytes_oob:/ {print $2}'`
-    #dev_total_bytes=`sudo ./nvm_dev info $mydev_path | gawk '/tbytes:/ {print $2}'`
-    #dev_total_mbytes=`sudo ./nvm_dev info $mydev_path | gawk '/tmbytes:/ {print $2}'`
-    #echo Device geometry: 
-    #echo -e "pugrp=\t\t\t$dev_npugrp, \nnpunit=\t\t\t$dev_npunit, \nnchunks=\t\t$dev_nchunk, \nnsectors=\t\t$dev_nsectr"
-    #echo -e "bytespersector=\t\t$dev_nbytespersectr, \noob=\t\t\t$dev_nbytes_oob, \ntotal bytes=\t\t$dev_total_bytes, \ntotal mbytes=\t\t$dev_total_mbytes"
-
 
     for (( i=0; i<$dev_npugrp; i++ ))
     do
@@ -145,7 +132,6 @@ nvm_write_read_all_chunks()
                 chunk_saddr=`sudo ./nvm_addr s20_to_gen $mydev_path $i $j $k 0 | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
                 #echo  "Chunk start address: $chunk_saddr"
                 #run_command "sudo ./nvm_vblk erase $mydev_path $chunk_saddr"
-                #nvm_vblk_addr_erase $mydev_path $chunk_saddr
                 nvm_vblk_addr_write $mydev_path $chunk_saddr
                 nvm_vblk_addr_read $mydev_path $chunk_saddr
 
@@ -156,12 +142,38 @@ nvm_write_read_all_chunks()
                     #echo in loop i=$i, j=$j, k=$k, l=$l
                 #done
             done
-            #TODO Check chunk state here.
         done
     done
-    echo -e "\n Writes and reads on all chunks completed. Verify CS=CLOSED(0x02) and WP=4096. \n"
+    echo -e "\nWrites and reads on all chunks completed. \nVerify CS=CLOSED(0x02) and WP=4096. \n"
     nvm_verify_all_cs_wp 0x02 4096
+}
 
+nvm_read_all_chunks()
+{
+    echo -e "\nStarting reads to all the chunks in device $mydev_path \n"
+
+    for (( i=0; i<$dev_npugrp; i++ ))
+    do
+        for (( j=0; j<$dev_npunit; j++ ))
+        do
+            for (( k=0; k<$dev_nchunk; k++ ))
+            #for (( k=0; k<5; k++ ))
+            do
+                # Generate chunk start address
+                chunk_saddr=`sudo ./nvm_addr s20_to_gen $mydev_path $i $j $k 0 | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
+                #echo  "Chunk start address: $chunk_saddr"
+                #run_command "sudo ./nvm_vblk erase $mydev_path $chunk_saddr"
+                nvm_vblk_addr_read $mydev_path $chunk_saddr
+                # Sector level ops
+                #for (( l=0; l<$dev_nsectr; l++))
+                #do
+                    #sudo ./nvm_addr s20_to_gen $mydev_path $i $j $k $l				
+                    #echo in loop i=$i, j=$j, k=$k, l=$l
+                #done
+            done
+        done
+    done
+    echo -e "\nWrites and reads on all chunks completed."
 }
 nvm_partial_chunk_write_and_verify_cs_wp()
 {
@@ -269,6 +281,70 @@ nvm_write_read_all_sectors()
     echo -e "\n Writes and reads on all sectors completed. Verify CS=CLOSED(0x02) and WP=4096. \n"
     nvm_verify_all_cs_wp 0x02 4096
 }
+
+#Issue erases, writes, reads to different pugrps and punits. 
+#Ex: If a ssd had 2 pugrps and each pugrp had 4 punits, then 8 process will start issuing cmds in parallel on the 8 punits.
+# Arg 1 is the command, i.e. erase or write or read
+nvm_issue_parallel_operations()
+{
+	echo -e "\nStarting parallel $1 operations on $mydev_path" 
+	for (( i=0; i<$dev_npugrp; i++ ))
+	do
+		for (( j=0; j<$dev_npunit; j++ ))
+		do
+			date >> ./logs/ocssd_sanity.log
+			echo "Running cmd sudo ./ocssd_p_unit_op.sh $1 $i $j $mydev_path $dev_nchunk &"
+			sudo ./ocssd_p_unit_op.sh $1 $i $j $mydev_path $dev_nchunk &
+		done
+	done
+	wait
+
+	echo -e "\nCompleted parallel $1 operations on $mydev_path"
+}
+
+
+nvm_line_erase_all_chunks()
+{
+    echo -e "\nStarting line erase of chunks"
+    let "npgrp = $dev_npugrp - 1"
+    let "npunit = $dev_npunit - 1"
+    for (( i=0; i<$dev_nchunk; i++))
+    do
+        run_command "sudo ./nvm_vblk line_erase $mydev_path 0 $npgrp 0 $npunit $i"
+    done
+    echo -e "\nErased $i lines across $dev_npugrp parallel groups and $dev_npunit parallel units."
+    echo -e "\nVerify CS=Free (0x01), WP=0."
+    nvm_verify_all_cs_wp 0x01 0
+}
+
+nvm_line_write_all_chunks()
+{
+    echo -e "\nStarting line write of chunks"
+    let "npgrp = $dev_npugrp - 1"
+    let "npunit = $dev_npunit - 1"
+    for (( i=0; i<$dev_nchunk; i++))
+    do
+        run_command "sudo ./nvm_vblk line_write $mydev_path 0 $npgrp 0 $npunit $i"
+    done
+    echo -e "\nWritten $i lines across $dev_npugrp parallel groups and $dev_npunit parallel units."
+    echo -e "\nVerify CS=CLOSED(0x02) and WP=4096. \n"
+    nvm_verify_all_cs_wp 0x02 4096
+}
+
+
+nvm_line_read_all_chunks()
+{
+    echo -e "\nStarting line read of chunks"
+    let "npgrp = $dev_npugrp - 1"
+    let "npunit = $dev_npunit - 1"
+    for (( i=0; i<$dev_nchunk; i++))
+    do
+        run_command "sudo ./nvm_vblk line_read $mydev_path 0 $npgrp 0 $npunit $i"
+    done
+    echo -e "\nRead $i lines across $dev_npugrp parallel groups and $dev_npunit parallel units."
+    #TODO: Data integrity check.
+}
+
 get_dev_geo()
 {
 
@@ -293,7 +369,8 @@ sleep 2
 if [ $# -ne 1 ]; then
 	usage
 fi
-echo "Creating a file of size 4K" > ./tmp.log
+mkdir -p logs
+echo "Creating a file of size 4K" > ./logs/ocssd_sanity.log
 
 create_4k_file
 
@@ -330,12 +407,20 @@ dev_info=`sudo ./nvm_dev info $mydev_path`
 
 #echo Stored attributes in dev_geo = $dev_geo
 get_dev_geo
-nvm_erase_and_verify_all_chunks
-nvm_write_read_all_chunks
+#nvm_issue_parallel_operations erase
+#nvm_verify_all_cs_wp 0x01 0
+#nvm_issue_parallel_operations write
+#nvm_verify_all_cs_wp 0x02 4096
+#nvm_line_erase_all_chunks
+#nvm_line_write_all_chunks
+#nvm_line_read_all_chunks
+#nvm_erase_and_verify_all_chunks
+nvm_write_verify_all_chunks
+nvm_read_all_chunks
 #nvm_erase_and_verify_all_chunks
 #nvm_write_read_all_sectors
-nvm_erase_and_verify_all_chunks
-nvm_partial_chunk_write_and_verify_cs_wp
+#nvm_erase_and_verify_all_chunks
+#nvm_partial_chunk_write_and_verify_cs_wp
 
 # Delete the git repository.
 # cd ../../../..
