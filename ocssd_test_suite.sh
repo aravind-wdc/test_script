@@ -227,18 +227,6 @@ nvm_write_read_all_sectors()
 {
 
     echo -e "\nStarting writes and reads on all sectors \n"
-    #mydev_path=$1
-    #dev_npugrp=`sudo ./nvm_dev info $mydev_path | gawk '/npugrp:/ {print $2}'`
-    #dev_npunit=`sudo ./nvm_dev info $mydev_path | gawk '/npunit:/ {print $2}'`
-    #dev_nchunk=`sudo ./nvm_dev info $mydev_path | gawk '/nchunk:/ {print $2}'`
-    #dev_nsectr=`sudo ./nvm_dev info $mydev_path | gawk '/nsectr:/ {print $2}'`
-    #dev_nbytespersectr=`sudo ./nvm_dev info $mydev_path | gawk '/nbytes:/ {print $2}'`
-    #dev_nbytes_oob=`sudo ./nvm_dev info $mydev_path | gawk '/nbytes_oob:/ {print $2}'`
-    #dev_total_bytes=`sudo ./nvm_dev info $mydev_path | gawk '/tbytes:/ {print $2}'`
-    #dev_total_mbytes=`sudo ./nvm_dev info $mydev_path | gawk '/tmbytes:/ {print $2}'`
-    #echo Device geometry: 
-    #echo -e "pugrp=\t\t\t$dev_npugrp, \nnpunit=\t\t\t$dev_npunit, \nnchunks=\t\t$dev_nchunk, \nnsectors=\t\t$dev_nsectr"
-    #echo -e "bytespersector=\t\t$dev_nbytespersectr, \noob=\t\t\t$dev_nbytes_oob, \ntotal bytes=\t\t$dev_total_bytes, \ntotal mbytes=\t\t$dev_total_mbytes"
     local count=0
 
     for (( i=0; i<$dev_npugrp; i++ ))
