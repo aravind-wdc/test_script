@@ -23,7 +23,7 @@ run_command()
 		# Want to exit the test ?
 		echo Command $1 failed with error code $?
         echo Exiting
-        exit 1
+        #exit 1
 	fi
 }
 
@@ -80,6 +80,32 @@ nvm_verify_all_cs_wp()
     done
     echo -e "\nVerified all chunk state to be $1 and write pointers to be $2 \n"
 
+
+}
+#Erase using nvme-dsm command
+nvm_dsm_erase_and_verify_all_chunks()
+{
+    echo -e "\nStarting erase of all chunks in the device: $mydev_path  \n"
+    echo -e "pugrp=\t\t\t$dev_npugrp, \nnpunit=\t\t\t$dev_npunit, \nnchunks=\t\t$dev_nchunk, \nnsectors=\t\t$dev_nsectr"
+    echo -e "bytespersector=\t\t$dev_nbytespersectr, \noob=\t\t\t$dev_nbytes_oob, \ntotal bytes=\t\t$dev_total_bytes, \ntotal mbytes=\t\t$dev_total_mbytes"
+
+    for (( i=0; i<$dev_npugrp; i++ ))
+    do
+        for (( j=0; j<$dev_npunit; j++ ))
+        do
+            for (( k=0; k<$dev_nchunk; k++ ))
+            do
+                # Generate chunk start address
+                chunk_saddr=`sudo ./nvm_addr s20_to_gen $mydev_path $i $j $k 0 | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
+                echo  "Chunk start address: $chunk_saddr"
+                dev_addr=`sudo ./nvm_addr gen2dev $mydev_path $chunk_saddr | gawk '{print $4}'`
+                echo  "lba start address: $dev_addr"
+                run_command "sudo nvme dsm $mydev_path -n 1 --slbs $dev_addr -c 0 -d 1"
+            done
+        done
+    done
+    nvm_verify_all_cs_wp 0x01 0
+    echo -e "\nErase and verify of all chunks complete. \n"
 
 }
 
@@ -395,20 +421,21 @@ dev_info=`sudo ./nvm_dev info $mydev_path`
 
 #echo Stored attributes in dev_geo = $dev_geo
 get_dev_geo
+nvm_dsm_erase_and_verify_all_chunks
+#nvm_erase_and_verify_all_chunks
+#nvm_write_verify_all_chunks
+#nvm_read_all_chunks
+#nvm_erase_and_verify_all_chunks
+#nvm_write_read_all_sectors
+#nvm_erase_and_verify_all_chunks
+#nvm_line_erase_all_chunks
+#nvm_line_write_all_chunks
+#nvm_line_read_all_chunks
+#nvm_partial_chunk_write_and_verify_cs_wp
 #nvm_issue_parallel_operations erase
 #nvm_verify_all_cs_wp 0x01 0
 #nvm_issue_parallel_operations write
 #nvm_verify_all_cs_wp 0x02 4096
-#nvm_line_erase_all_chunks
-#nvm_line_write_all_chunks
-#nvm_line_read_all_chunks
-#nvm_erase_and_verify_all_chunks
-nvm_write_verify_all_chunks
-nvm_read_all_chunks
-#nvm_erase_and_verify_all_chunks
-#nvm_write_read_all_sectors
-#nvm_erase_and_verify_all_chunks
-#nvm_partial_chunk_write_and_verify_cs_wp
 
 # Delete the git repository.
 # cd ../../../..
