@@ -23,7 +23,7 @@ run_command()
 		# Want to exit the test ?
 		echo Command $1 failed with error code $?
         echo Exiting
-        #exit 1
+        exit 1
 	fi
 }
 
