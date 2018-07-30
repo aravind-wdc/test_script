@@ -29,53 +29,45 @@ fio_log=$logs/fio.log
 echo "Logging test results to $fio_log"
 echo "Starting fio workloads on device $1" > $fio_log
 
-fio_read $1 $2 4k 1 "read"
-#echo -e "\nStarting 4k sequential reads on $1, with IO Queue Depth 8 \n"
-fio_read $1 $2 4k 8 "read"
+fio_write $1 $2 64k 1 "write"
 
-#echo -e "\nStarting 4k sequential reads on $1, with IO Queue Depth 32 \n"
-fio_read $1 $2 4k 32 "read"
+fio_write $1 $2 64k 8 "write"
 
-#echo -e "\nStarting 64k sequential reads on $1, with IO Queue Depth 1 \n"
-fio_read $1 $2 64k 1 "read"
+fio_write $1 $2 64k 32 "write"
 
-
-#echo -e "\nStarting 64k sequential reads on $1, with IO Queue Depth 8 \n"
-fio_read $1 $2 64k 8 "read"
-
-
-#echo -e "\nStarting 128k sequential reads on $1, with IO Queue Depth 1 \n"
-fio_read $1 $2 128k 1 "read"
-
-#echo -e "\nStarting 128k sequential reads on $1, with IO Queue Depth 8 \n"
-fio_read $1 $2 128k 8 "read"
-
-#echo -e "\nStarting 128k sequential reads on $1, with IO Queue Depth 32 \n"
-fio_read $1 $2 128k 32 "read"
-#fio --name=seqR4k --filename=$1 --rw=read --direct=1 --bs=128k --size=$2 --iodepth=32 -minimal | gawk -F'[;]' '{print "Total I/O: "$6 "KB", "Bandwidth: "$7 "KB/s", "IOPS: "$8, "Runtime: "$9 "ms"}'
-
-#echo -e "\nStarting 128k sequential writes on $1, with IO Queue Depth 1 \n"
 fio_write $1 $2 128k 1 "write"
 
-#echo -e "\nStarting 128k sequential writes on $1, with IO Queue Depth 8 \n"
 fio_write $1 $2 128k 8 "write"
 
-#echo -e "\nStarting 128k sequential writes on $1, with IO Queue Depth 32 \n"
 fio_write $1 $2 128k 32 "write"
 
-#echo -e "\nStarting 4k sequential writes on $1, with IO Queue Depth 1 \n"
-fio_write $1 $2 4k 1 "write"
+fio_write $1 $2 64k 1 "randwrite"
 
-fio_write $1 $2 4k 8 "write"
-
-fio_write $1 $2 4k 32 "write"
-
-
-fio_write $1 $2 4k 1 "randwrite"
-
-
-fio_write $1 $2 4k 32 "randwrite"
+fio_write $1 $2 64k 32 "randwrite"
 
 fio_write $1 $2 128k 1 "randwrite"
 
 fio_write $1 $2 128k 32 "randwrite"
+
+
+fio_read $1 $2 64k 1 "read"
+
+fio_read $1 $2 64k 8 "read"
+
+fio_read $1 $2 64k 32 "read"
+
+fio_read $1 $2 64k 1 "randread"
+
+fio_read $1 $2 64k 32 "randread"
+
+fio_read $1 $2 128k 1 "read"
+
+fio_read $1 $2 128k 8 "read"
+
+fio_read $1 $2 128k 32 "read"
+
+fio_read $1 $2 128k 1 "randread"
+
+fio_read $1 $2 128k 32 "randread"
+#fio --name=seqR4k --filename=$1 --rw=read --direct=1 --bs=128k --size=$2 --iodepth=32 -minimal | gawk -F'[;]' '{print "Total I/O: "$6 "KB", "Bandwidth: "$7 "KB/s", "IOPS: "$8, "Runtime: "$9 "ms"}'
+

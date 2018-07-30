@@ -97,9 +97,9 @@ nvm_dsm_erase_and_verify_all_chunks()
             do
                 # Generate chunk start address
                 chunk_saddr=`sudo $llnvm_path/nvm_addr s20_to_gen $mydev_path $i $j $k 0 | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
-                echo  "Chunk start address: $chunk_saddr"
+                #echo  "Chunk start address: $chunk_saddr"
                 dev_addr=`sudo $llnvm_path/nvm_addr gen2dev $mydev_path $chunk_saddr | gawk '{print $4}'`
-                echo  "lba start address: $dev_addr"
+                #echo  "lba start address: $dev_addr"
                 run_command "sudo nvme dsm $mydev_path -n 1 --slbs $dev_addr -c 0 -d 1"
             done
         done
@@ -145,7 +145,7 @@ create_4k_file()
 
 nvm_write_verify_all_chunks()
 {
-    echo -e "\nStarting writes and reads to all the chunks in device $mydev_path \n"
+    echo -e "\nStarting writes to all the chunks in device $mydev_path \n"
 
     for (( i=0; i<$dev_npugrp; i++ ))
     do
@@ -170,7 +170,7 @@ nvm_write_verify_all_chunks()
             done
         done
     done
-    echo -e "\nWrites and reads on all chunks completed. \nVerify CS=CLOSED(0x02) and WP=4096. \n"
+    echo -e "\nWrites on all chunks completed. \nVerify CS=CLOSED(0x02) and WP=4096. \n"
     nvm_verify_all_cs_wp 0x02 4096
 }
 
@@ -199,7 +199,7 @@ nvm_read_all_chunks()
             done
         done
     done
-    echo -e "\nWrites and reads on all chunks completed."
+    echo -e "\nReads on all chunks completed."
 }
 nvm_partial_chunk_write_and_verify_cs_wp()
 {
@@ -307,8 +307,8 @@ nvm_issue_parallel_operations()
 		for (( j=0; j<$dev_npunit; j++ ))
 		do
 			date >> $logs/ocssd_sanity.log
-			echo "Running cmd sudo ./ocssd_p_unit_op.sh $1 $i $j $mydev_path $dev_nchunk &"
-			sudo ./ocssd_p_unit_op.sh $1 $i $j $mydev_path $dev_nchunk $llnvm_path $logs &
+			echo "Running cmd sudo ./ocssd_p_unit_op.sh $1 $i $j $mydev_path $dev_nchunk $logs $llnvm_path &"
+			sudo ./ocssd_p_unit_op.sh $1 $i $j $mydev_path $dev_nchunk $logs $llnvm_path  &
 		done
 	done
 	wait
@@ -437,26 +437,41 @@ run_command "sudo $llnvm_path/nvm_dev info $mydev_path"
 #dev_info=`sudo $llnvm_path/nvm_dev info $mydev_path`
 
 #echo Stored attributes in dev_geo = $dev_geo
+echo "Test 1"
 get_dev_geo
 
+echo "Test 2"
 nvm_dsm_erase_and_verify_all_chunks
-#nvm_erase_and_verify_all_chunks
+###nvm_erase_and_verify_all_chunks
+echo "Test 3"
 nvm_write_verify_all_chunks
+echo "Test 4"
 nvm_read_all_chunks
+echo "Test 5"
 nvm_dsm_erase_and_verify_all_chunks
-#nvm_erase_and_verify_all_chunks
-#nvm_write_read_all_sectors
+###nvm_line_erase_all_chunks #TODO: uncomment once the fw supports the erase command
+nvm_line_write_all_chunks
+echo "Test 6"
+nvm_line_read_all_chunks
+echo "Test 7"
 nvm_dsm_erase_and_verify_all_chunks
-#nvm_erase_and_verify_all_chunks
-#nvm_line_erase_all_chunks
-#nvm_line_write_all_chunks
-#nvm_line_read_all_chunks
-#nvm_partial_chunk_write_and_verify_cs_wp
-#nvm_issue_parallel_operations erase
-#nvm_verify_all_cs_wp 0x01 0
-#nvm_issue_parallel_operations write
-#nvm_verify_all_cs_wp 0x02 4096
+nvm_partial_chunk_write_and_verify_cs_wp
+echo "Test 8"
+###nvm_issue_parallel_operations erase
+###nvm_verify_all_cs_wp 0x01 0
+echo "Test 9"
+nvm_dsm_erase_and_verify_all_chunks
+nvm_issue_parallel_operations write
+nvm_verify_all_cs_wp 0x02 4096
+echo "Test 10"
+nvm_issue_parallel_operations "read"
+### Sector level operations take a lot of time, uncomment below 2 lines to do sector ops.
+###nvm_erase_and_verify_all_chunks
+###echo "Test 11"
+###nvm_dsm_erase_and_verify_all_chunks
+###nvm_write_read_all_sectors
 
-# Delete the git repository.
+
+# Delete the git repository. Uncomment this when it goes to the smoke env so that latest liblightnvm can be used everytime
 #cd ../../..
 #rm -rf ./liblightnvm
