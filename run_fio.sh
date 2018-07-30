@@ -4,17 +4,17 @@
 
 fio_read()
 {
-	echo -e "\nStarting $2 $5 of bs $3 on $1, with IO Queue Depth $4 \n"
-	fio --name=seqR4k --filename=$1 --rw=$5 --bs=$3 --size=$2 --iodepth=$4 -minimal | gawk -F'[;]' '{print "Total I/O: "$6 "KB", "\nBandwidth: "$7 "KB/s", "\nIOPS: "$8, "\nRuntime: "$9 "ms"}'
-	echo ""
+	echo -e "\nStarting $2 $5 of bs $3 on $1, with IO Queue Depth $4 \n" >> $fio_log
+	fio --name=seqR4k --filename=$1 --rw=$5 --bs=$3 --size=$2 --iodepth=$4 -minimal | gawk -F'[;]' '{print "Total I/O: "$6 "KB", "\nBandwidth: "$7 "KB/s", "\nIOPS: "$8, "\nRuntime: "$9 "ms"}' >> $fio_log
+	echo -e "\nCompleted $2 $5 of bs $3 on $1, with IO Queue Depth $4 \n"
 
 }
 
 fio_write()
 {
-	echo -e "\nStarting $2 $5 of bs $3 on $1, with IO Queue Depth $4 \n"
-	fio --name=seqR4k --filename=$1 --rw=$5 --bs=$3 --size=$2 --iodepth=$4 -minimal | gawk -F'[;]' '{print "Total I/O: "$47 "KB", "\nBandwidth: "$48 "KB/s", "\nIOPS: "$49, "\nRuntime: "$50 "ms"}'
-	echo ""
+	echo -e "\nStarting $2 $5 of bs $3 on $1, with IO Queue Depth $4 \n" >> $fio_log
+	fio --name=seqR4k --filename=$1 --rw=$5 --bs=$3 --size=$2 --iodepth=$4 -minimal --direct=1 | gawk -F'[;]' '{print "Total I/O: "$47 "KB", "\nBandwidth: "$48 "KB/s", "\nIOPS: "$49, "\nRuntime: "$50 "ms"}' >> $fio_log
+	echo -e "\nCompleted $2 $5 of bs $3 on $1, with IO Queue Depth $4 \n"
 
 }
 
@@ -23,6 +23,11 @@ echo Starting fio on device $1
 echo ===============================================
 #Do warmup of device
 
+logs=./logdir
+fio_log=$logs/fio.log
+
+echo "Logging test results to $fio_log"
+echo "Starting fio workloads on device $1" > $fio_log
 
 fio_read $1 $2 4k 1 "read"
 #echo -e "\nStarting 4k sequential reads on $1, with IO Queue Depth 8 \n"
