@@ -31,7 +31,7 @@ run_command()
 nvm_vblk_addr_erase()
 {
     echo Erasing block $2 on device $1 >> $logs/ocssd_sanity.log
-	sudo $llnvm_path/nvm_vblk erase $1 $2 >> $logs/ocssd_sanity.log
+	sudo $llnvm_path_be_lba/nvm_vblk erase $1 $2 >> $logs/ocssd_sanity.log
 	ret_val=$?
 	if [ $ret_val -ne 0 ];
 	then
@@ -43,7 +43,7 @@ nvm_vblk_addr_erase()
 nvm_vblk_addr_write()
 {
     echo Writing block $2 on device $1 >> $logs/ocssd_sanity.log
-	sudo $llnvm_path/nvm_vblk write $1 $2 >> $logs/ocssd_sanity.log
+	sudo $llnvm_path_be_lba/nvm_vblk write $1 $2 >> $logs/ocssd_sanity.log
 	ret_val=$?
 	if [ $ret_val -ne 0 ];
 	then
@@ -55,7 +55,7 @@ nvm_vblk_addr_write()
 nvm_vblk_addr_read()
 {
     echo Reading block $2 on device $1 >> $logs/ocssd_sanity.log
-	sudo $llnvm_path/nvm_vblk read $1 $2 >> $logs/ocssd_sanity.log
+	sudo $llnvm_path_be_lba/nvm_vblk read $1 $2 >> $logs/ocssd_sanity.log
 	ret_val=$?
 	if [ $ret_val -ne 0 ];
 	then
@@ -67,7 +67,7 @@ nvm_vblk_addr_read()
 nvm_verify_all_cs_wp()
 {
     echo -e "\nVerifying all chunk state to be $1 and write pointers to be $2 \n"
-    sudo $llnvm_path/nvm_cmd rprt_all $mydev_path | grep slba | while read -r line ; do
+    sudo $llnvm_path_be_lba/nvm_cmd rprt_all $mydev_path | grep slba | while read -r line ; do
         #echo -e "Processing \n $line"
         slba=`echo "$line" | gawk '/slba:/ {print $4}' | gawk -F '[,]' '{print $1}'`
         wp=`echo "$line" | gawk '/wp:/ {print $8}' | gawk -F '[,]' '{print $1}'`
@@ -95,9 +95,9 @@ nvm_dsm_erase_and_verify_all_chunks()
             for (( k=0; k<$dev_nchunk; k++ ))
             do
                 # Generate chunk start address
-                chunk_saddr=`sudo $llnvm_path/nvm_addr s20_to_gen $mydev_path $i $j $k 0 | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
+                chunk_saddr=`sudo $llnvm_path_be_lba/nvm_addr s20_to_gen $mydev_path $i $j $k 0 | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
                 #echo  "Chunk start address: $chunk_saddr"
-                dev_addr=`sudo $llnvm_path/nvm_addr gen2dev $mydev_path $chunk_saddr | gawk '{print $4}'`
+                dev_addr=`sudo $llnvm_path_be_lba/nvm_addr gen2dev $mydev_path $chunk_saddr | gawk '{print $4}'`
                 #echo  "lba start address: $dev_addr"
                 run_command "sudo nvme dsm $mydev_path -n 1 --slbs $dev_addr -c 0 -d 1"
             done
@@ -122,9 +122,9 @@ nvm_erase_and_verify_all_chunks()
             for (( k=0; k<$dev_nchunk; k++ ))
             do
                 # Generate chunk start address
-                chunk_saddr=`sudo $llnvm_path/nvm_addr s20_to_gen $mydev_path $i $j $k 0 | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
+                chunk_saddr=`sudo $llnvm_path_be_lba/nvm_addr s20_to_gen $mydev_path $i $j $k 0 | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
                 #echo  "Chunk start address: $chunk_saddr"
-                #run_command "sudo $llnvm_path/nvm_vblk erase $mydev_path $chunk_saddr"
+                #run_command "sudo $llnvm_path_be_lba/nvm_vblk erase $mydev_path $chunk_saddr"
                 nvm_vblk_addr_erase $mydev_path $chunk_saddr
 
             done
@@ -169,9 +169,9 @@ nvm_data_validation_all_chunks()
             #for (( k=0; k<5; k++ ))
             do
                 # Generate chunk start address
-                chunk_saddr=`sudo $llnvm_path/nvm_addr s20_to_gen $mydev_path $i $j $k 0 | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
-				run_command "sudo $llnvm_path/nvm_vblk write $mydev_path $chunk_saddr -i ./16M_data" 
-				run_command "sudo $llnvm_path/nvm_vblk read $mydev_path $chunk_saddr -o ./read_output"
+                chunk_saddr=`sudo $llnvm_path_be_lba/nvm_addr s20_to_gen $mydev_path $i $j $k 0 | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
+				run_command "sudo $llnvm_path_be_lba/nvm_vblk write $mydev_path $chunk_saddr -i ./16M_data"
+				run_command "sudo $llnvm_path_be_lba/nvm_vblk read $mydev_path $chunk_saddr -o ./read_output"
 				diff ./16M_data ./read_output 
 				data_error=$?
 				if [ $data_error -eq 1 ]; then
@@ -199,15 +199,15 @@ nvm_write_verify_all_chunks()
             #for (( k=0; k<5; k++ ))
             do
                 # Generate chunk start address
-                chunk_saddr=`sudo $llnvm_path/nvm_addr s20_to_gen $mydev_path $i $j $k 0 | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
+                chunk_saddr=`sudo $llnvm_path_be_lba/nvm_addr s20_to_gen $mydev_path $i $j $k 0 | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
                 #echo  "Chunk start address: $chunk_saddr"
-                #run_command "sudo $llnvm_path/nvm_vblk erase $mydev_path $chunk_saddr"
+                #run_command "sudo $llnvm_path_be_lba/nvm_vblk erase $mydev_path $chunk_saddr"
                 nvm_vblk_addr_write $mydev_path $chunk_saddr
 
                 # Sector level ops
                 #for (( l=0; l<$dev_nsectr; l++))
                 #do
-                    #sudo $llnvm_path/nvm_addr s20_to_gen $mydev_path $i $j $k $l				
+                    #sudo $llnvm_path_be_lba/nvm_addr s20_to_gen $mydev_path $i $j $k $l
                     #echo in loop i=$i, j=$j, k=$k, l=$l
                 #done
             done
@@ -229,14 +229,14 @@ nvm_read_all_chunks()
             #for (( k=0; k<5; k++ ))
             do
                 # Generate chunk start address
-                chunk_saddr=`sudo $llnvm_path/nvm_addr s20_to_gen $mydev_path $i $j $k 0 | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
+                chunk_saddr=`sudo $llnvm_path_be_lba/nvm_addr s20_to_gen $mydev_path $i $j $k 0 | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
                 #echo  "Chunk start address: $chunk_saddr"
                 #run_command "sudo ./nvm_vblk erase $mydev_path $chunk_saddr"
                 nvm_vblk_addr_read $mydev_path $chunk_saddr
                 # Sector level ops
                 #for (( l=0; l<$dev_nsectr; l++))
                 #do
-                    #sudo $llnvm_path/nvm_addr s20_to_gen $mydev_path $i $j $k $l				
+                    #sudo $llnvm_path_be_lba/nvm_addr s20_to_gen $mydev_path $i $j $k $l
                     #echo in loop i=$i, j=$j, k=$k, l=$l
                 #done
             done
@@ -280,7 +280,7 @@ nvm_partial_chunk_write_and_verify_cs_wp()
             
             if [ $count -gt 0 -a $count -lt 32 ];
             then
-                run_command "sudo $llnvm_path/nvm_cmd write $mydev_path $s_addr"
+                run_command "sudo $llnvm_path_be_ioctl/nvm_cmd write $mydev_path $s_addr"
                 count=0
                 s_addr=""
             fi
@@ -310,15 +310,15 @@ nvm_write_read_all_sectors()
                 for (( l=0; l<$dev_nsectr; l++))
                 do
                     # Generate sector start address
-                    sector_saddr=`sudo $llnvm_path/nvm_addr s20_to_gen $mydev_path $i $j $k $l | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
+                    sector_saddr=`sudo $llnvm_path_be_lba/nvm_addr s20_to_gen $mydev_path $i $j $k $l | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
                     local s_addr=$s_addr" $sector_saddr"
                     ((count++))
                     #echo -e "sector address = $s_addr count = $count"
                     if [ $count -eq 32 ]; #TODO: Ensure nsector is multiple of 8
                     then
-                        run_command "sudo $llnvm_path/nvm_cmd write $mydev_path $s_addr"
+                        run_command "sudo $llnvm_path_be_ioctl/nvm_cmd write $mydev_path $s_addr"
                         count=0
-                        run_command "sudo $llnvm_path/nvm_cmd read $mydev_path $s_addr"
+                        run_command "sudo $llnvm_path_be_ioctl/nvm_cmd read $mydev_path $s_addr"
                         s_addr=""
                     fi
                     #run_command "sudo ./nvm_cmd write $mydev_path $chunk_saddr"
@@ -327,9 +327,9 @@ nvm_write_read_all_sectors()
                 # Do the writes/reads to the remaining sectors (nsects%32)
                 if [ $count -gt 0 -a $count -lt 32 ];
                 then
-                    run_command "sudo $llnvm_path/nvm_cmd write $mydev_path $s_addr"
+                    run_command "sudo $llnvm_path_be_ioctl/nvm_cmd write $mydev_path $s_addr"
                     count=0
-                    run_command "sudo $llnvm_path/nvm_cmd read $mydev_path $s_addr"
+                    run_command "sudo $llnvm_path_be_ioctl/nvm_cmd read $mydev_path $s_addr"
                     s_addr=""
                 fi
             done
@@ -367,7 +367,7 @@ nvm_line_erase_all_chunks()
     let "npunit = $dev_npunit - 1"
     for (( i=0; i<$dev_nchunk; i++))
     do
-        run_command "sudo $llnvm_path/nvm_vblk line_erase $mydev_path 0 $npgrp 0 $npunit $i"
+        run_command "sudo $llnvm_path_be_lba/nvm_vblk line_erase $mydev_path 0 $npgrp 0 $npunit $i"
     done
     echo -e "\nErased $i lines across $dev_npugrp parallel groups and $dev_npunit parallel units."
     echo -e "\nVerify CS=Free (0x01), WP=0."
@@ -381,7 +381,7 @@ nvm_line_write_all_chunks()
     let "npunit = $dev_npunit - 1"
     for (( i=0; i<$dev_nchunk; i++))
     do
-        run_command "sudo $llnvm_path/nvm_vblk line_write $mydev_path 0 $npgrp 0 $npunit $i"
+        run_command "sudo $llnvm_path_be_lba/nvm_vblk line_write $mydev_path 0 $npgrp 0 $npunit $i"
     done
     echo -e "\nWritten $i lines across $dev_npugrp parallel groups and $dev_npunit parallel units."
     echo -e "\nVerify CS=CLOSED(0x02) and WP=4096. \n"
@@ -396,7 +396,7 @@ nvm_line_read_all_chunks()
     let "npunit = $dev_npunit - 1"
     for (( i=0; i<$dev_nchunk; i++))
     do
-        run_command "sudo $llnvm_path/nvm_vblk line_read $mydev_path 0 $npgrp 0 $npunit $i"
+        run_command "sudo $llnvm_path_be_lba/nvm_vblk line_read $mydev_path 0 $npgrp 0 $npunit $i"
     done
     echo -e "\nRead $i lines across $dev_npugrp parallel groups and $dev_npunit parallel units."
     #TODO: Data integrity check.
@@ -421,14 +421,14 @@ fi
 get_dev_geo()
 {
 
-    dev_npugrp=`sudo $llnvm_path/nvm_dev info $mydev_path | gawk '/npugrp:/ {print $2}'`
-    dev_npunit=`sudo $llnvm_path/nvm_dev info $mydev_path | gawk '/npunit:/ {print $2}'`
-    dev_nchunk=`sudo $llnvm_path/nvm_dev info $mydev_path | gawk '/nchunk:/ {print $2}'`
-    dev_nsectr=`sudo $llnvm_path/nvm_dev info $mydev_path | gawk '/nsectr:/ {print $2}'`
-    dev_nbytespersectr=`sudo $llnvm_path/nvm_dev info $mydev_path | gawk '/nbytes:/ {print $2}'`
-    dev_nbytes_oob=`sudo $llnvm_path/nvm_dev info $mydev_path | gawk '/nbytes_oob:/ {print $2}'`
-    dev_total_bytes=`sudo $llnvm_path/nvm_dev info $mydev_path | gawk '/tbytes:/ {print $2}'`
-    dev_total_mbytes=`sudo $llnvm_path/nvm_dev info $mydev_path | gawk '/tmbytes:/ {print $2}'`
+    dev_npugrp=`sudo $llnvm_path_be_lba/nvm_dev info $mydev_path | gawk '/npugrp:/ {print $2}'`
+    dev_npunit=`sudo $llnvm_path_be_lba/nvm_dev info $mydev_path | gawk '/npunit:/ {print $2}'`
+    dev_nchunk=`sudo $llnvm_path_be_lba/nvm_dev info $mydev_path | gawk '/nchunk:/ {print $2}'`
+    dev_nsectr=`sudo $llnvm_path_be_lba/nvm_dev info $mydev_path | gawk '/nsectr:/ {print $2}'`
+    dev_nbytespersectr=`sudo $llnvm_path_be_lba/nvm_dev info $mydev_path | gawk '/nbytes:/ {print $2}'`
+    dev_nbytes_oob=`sudo $llnvm_path_be_lba/nvm_dev info $mydev_path | gawk '/nbytes_oob:/ {print $2}'`
+    dev_total_bytes=`sudo $llnvm_path_be_lba/nvm_dev info $mydev_path | gawk '/tbytes:/ {print $2}'`
+    dev_total_mbytes=`sudo $llnvm_path_be_lba/nvm_dev info $mydev_path | gawk '/tmbytes:/ {print $2}'`
     echo Device geometry: 
     echo -e "pugrp=\t\t\t$dev_npugrp, \nnpunit=\t\t\t$dev_npunit, \nnchunks=\t\t$dev_nchunk, \nnsectors=\t\t$dev_nsectr"
     echo -e "bytespersector=\t\t$dev_nbytespersectr, \noob=\t\t\t$dev_nbytes_oob, \ntotal bytes=\t\t$dev_total_bytes, \ntotal mbytes=\t\t$dev_total_mbytes"
@@ -457,8 +457,9 @@ create_4k_file
 create_16M_file
 
 get_liblightnvm
-llnvm_path="NVM_CLI_BE_ID=4 ./liblightnvm/build/cli"
-llnvm_path_be_ioctl="./liblightnvm/build/cli"
+llnvm_path_be_lba="NVM_CLI_BE_ID=4 ./liblightnvm/build/cli"
+llnvm_path_be_ioctl="NVM_CLI_BE_ID=1 ./liblightnvm/build/cli"
+llnvm_path="./liblightnvm/build/cli"
 mydev_path=$1
 
 #echo Device path = $mydev_path
@@ -467,20 +468,12 @@ mydev_path=$1
 #run_command "sudo ./nvm_cmd idfy $mydev_path"
 
 #echo "llnvm_path = $llnvm_path"
-run_command "sudo $llnvm_path/nvm_cmd idfy $mydev_path"
+run_command "sudo $llnvm_path_be_ioctl/nvm_cmd idfy $mydev_path"
 echo "Running tests on device $mydev_path"
-run_command "sudo $llnvm_path/nvm_cmd idfy $mydev_path"
+run_command "sudo $llnvm_path_be_lba/nvm_cmd idfy $mydev_path"
 #run_command "sudo $llnvm_path/nvm_dev attr $mydev_path"
-run_command "sudo $llnvm_path/nvm_dev info $mydev_path"
-#run_command "sudo $llnvm_path/nvm_dev geo $mydev_path"
-#run_command "sudo $llnvm_path/nvm_dev ppaf $mydev_path"
-#dev_attr=`sudo $llnvm_path/nvm_dev attr $mydev_path`
+run_command "sudo $llnvm_path_be_lba/nvm_dev info $mydev_path"
 
-#echo Stored attributes in dev_attr = $dev_attr
-#dev_geo=`sudo $llnvm_path/nvm_dev geo $mydev_path`
-#dev_info=`sudo $llnvm_path/nvm_dev info $mydev_path`
-
-#echo Stored attributes in dev_geo = $dev_geo
 echo "Test 1"
 get_dev_geo
 echo "Test 2"
