@@ -3,9 +3,9 @@
 
 usage()
 {
-	echo Usage: Pass the ocssd nvme device path, ex: /dev/nvme0n1
-	echo Ensure liblightnvm is installed.
-	echo Run as sudo ocssd_basic_test.sh
+	echo "Usage: Pass the ocssd nvme device path, ex: /dev/nvme0n1"
+	echo "Ensure liblightnvm is installed."
+	echo "Run as sudo ocssd_test_suite.sh <dev path>"
 
 }
 
@@ -76,18 +76,17 @@ nvm_verify_all_cs_wp()
         then
             echo "Slba = $slba, Expected CS=$1, Reported CS=$cs Expected WP:$2, Reported WP=$wp "
             echo "Failure: Unexpected write pointer or chunkstate found, exiting."
+			exit 1
         fi
     done
     echo -e "\nVerified all chunk state to be $1 and write pointers to be $2 \n"
-
-
 }
 #Erase using nvme-dsm command
 nvm_dsm_erase_and_verify_all_chunks()
 {
     echo -e "\nStarting erase of all chunks in the device: $mydev_path  \n"
-    echo -e "pugrp=\t\t\t$dev_npugrp, \nnpunit=\t\t\t$dev_npunit, \nnchunks=\t\t$dev_nchunk, \nnsectors=\t\t$dev_nsectr"
-    echo -e "bytespersector=\t\t$dev_nbytespersectr, \noob=\t\t\t$dev_nbytes_oob, \ntotal bytes=\t\t$dev_total_bytes, \ntotal mbytes=\t\t$dev_total_mbytes"
+#    echo -e "pugrp=\t\t\t$dev_npugrp, \nnpunit=\t\t\t$dev_npunit, \nnchunks=\t\t$dev_nchunk, \nnsectors=\t\t$dev_nsectr"
+#    echo -e "bytespersector=\t\t$dev_nbytespersectr, \noob=\t\t\t$dev_nbytes_oob, \ntotal bytes=\t\t$dev_total_bytes, \ntotal mbytes=\t\t$dev_total_mbytes"
 
     for (( i=0; i<$dev_npugrp; i++ ))
     do
@@ -137,10 +136,55 @@ nvm_erase_and_verify_all_chunks()
 
 create_4k_file()
 {
-    for (( x=0; x<1024; x++ ))
+    ##for (( x=0; x<1024; x++ ))
+	if [ ! -f ./4K_data ]; then
+		for (( x=0; x<128; x++ ))
+		do
+			##echo "xby" >> ./4k_data
+			echo "This is a 31 char test string!." >> ./4K_data
+		done
+	fi
+}
+create_16M_file()
+{
+	if [ ! -f ./16M_data ]; then
+		for (( x=0; x<4096; x++ ))
+		do
+			#echo "This is a 31 char test string!." >> ./4k_data
+			cat ./4K_data >> ./16M_data
+		done
+	fi
+}
+
+#Data Validation. Do writes from the input file and verify the data after read.
+nvm_data_validation_all_chunks()
+{
+	echo -e "\nStarting data validation tests on all chunks"
+
+    for (( i=0; i<$dev_npugrp; i++ ))
     do
-        echo "xby" >> ./4k_data
-    done
+        for (( j=0; j<$dev_npunit; j++ ))
+        do
+            for (( k=0; k<$dev_nchunk; k++ ))
+            #for (( k=0; k<5; k++ ))
+            do
+                # Generate chunk start address
+                chunk_saddr=`sudo $llnvm_path/nvm_addr s20_to_gen $mydev_path $i $j $k 0 | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
+				run_command "sudo $llnvm_path/nvm_vblk write $mydev_path $chunk_saddr -i ./16M_data" 
+				run_command "sudo $llnvm_path/nvm_vblk read $mydev_path $chunk_saddr -o ./read_output"
+				diff ./16M_data ./read_output 
+				data_error=$?
+				if [ $data_error -eq 1 ]; then
+					echo -e "\nError: Unexpected data read from the disk at chunk addr: $chunk_saddr"
+					exit 1
+				fi
+				rm -rf ./read_output
+			done
+		done
+	done
+
+	echo -e "\nCompleted validating data across the disk.\n"
+
 }
 
 nvm_write_verify_all_chunks()
@@ -159,7 +203,6 @@ nvm_write_verify_all_chunks()
                 #echo  "Chunk start address: $chunk_saddr"
                 #run_command "sudo $llnvm_path/nvm_vblk erase $mydev_path $chunk_saddr"
                 nvm_vblk_addr_write $mydev_path $chunk_saddr
-                nvm_vblk_addr_read $mydev_path $chunk_saddr
 
                 # Sector level ops
                 #for (( l=0; l<$dev_nsectr; l++))
@@ -216,13 +259,13 @@ nvm_partial_chunk_write_and_verify_cs_wp()
             do
                 #echo  "Chunk start address: $chunk_saddr"
                 # Generate sector start address
-                sector_saddr=`sudo $llnvm_path/nvm_addr s20_to_gen $mydev_path $i $j $k 0 | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
+                sector_saddr=`sudo $llnvm_path_be_ioctl/nvm_addr s20_to_gen $mydev_path $i $j $k 0 | gawk '/val:/ {print $3}' | gawk -F '[,]' '{print $1}'`
                 local s_addr=$s_addr" $sector_saddr"
                 ((count++))
                 #echo -e "sector address = $s_addr count = $count"
                 if [ $count -eq 32 ];
                 then
-                    run_command "sudo $llnvm_path/nvm_cmd write $mydev_path $s_addr"
+                    run_command "sudo $llnvm_path_be_ioctl/nvm_cmd write $mydev_path $s_addr"
                     count=0
                     #run_command "sudo $llnvm_path/nvm_cmd read $mydev_path $s_addr"
                     s_addr=""
@@ -394,10 +437,11 @@ get_dev_geo()
 echo =======================================================================================================================================
 echo "Starting unit tests for ocssd on device $1. This test deletes all data on the disk, stop now, if you are not sure(Ctrl-c)."
 echo =======================================================================================================================================
-sleep 1
+sleep 5 
 
 if [ $# -ne 1 ]; then
 	usage
+	exit 1
 fi
 mkdir -p logdir
 logs=$PWD/logdir
@@ -408,8 +452,13 @@ if [ ! -b $1 ]; then
 	exit 1
 fi
 
+echo "Creating a file of size 4K and 16M" > $logs/ocssd_sanity.log
+create_4k_file
+create_16M_file
+
 get_liblightnvm
-llnvm_path=./liblightnvm/build/cli
+llnvm_path="NVM_CLI_BE_ID=4 ./liblightnvm/build/cli"
+llnvm_path_be_ioctl="./liblightnvm/build/cli"
 mydev_path=$1
 
 #echo Device path = $mydev_path
@@ -419,12 +468,7 @@ mydev_path=$1
 
 #echo "llnvm_path = $llnvm_path"
 run_command "sudo $llnvm_path/nvm_cmd idfy $mydev_path"
-
-echo "Creating a file of size 4K" > $logs/ocssd_sanity.log
-create_4k_file
-
 echo "Running tests on device $mydev_path"
-
 run_command "sudo $llnvm_path/nvm_cmd idfy $mydev_path"
 #run_command "sudo $llnvm_path/nvm_dev attr $mydev_path"
 run_command "sudo $llnvm_path/nvm_dev info $mydev_path"
@@ -439,7 +483,6 @@ run_command "sudo $llnvm_path/nvm_dev info $mydev_path"
 #echo Stored attributes in dev_geo = $dev_geo
 echo "Test 1"
 get_dev_geo
-
 echo "Test 2"
 nvm_dsm_erase_and_verify_all_chunks
 ###nvm_erase_and_verify_all_chunks
@@ -461,13 +504,16 @@ echo "Test 8"
 ###nvm_verify_all_cs_wp 0x01 0
 echo "Test 9"
 nvm_dsm_erase_and_verify_all_chunks
-nvm_issue_parallel_operations write
+nvm_issue_parallel_operations "write"
 nvm_verify_all_cs_wp 0x02 4096
 echo "Test 10"
 nvm_issue_parallel_operations "read"
+echo "Test 11"
+nvm_dsm_erase_and_verify_all_chunks
+nvm_data_validation_all_chunks
 ### Sector level operations take a lot of time, uncomment below 2 lines to do sector ops.
+###echo "Test 12"
 ###nvm_erase_and_verify_all_chunks
-###echo "Test 11"
 ###nvm_dsm_erase_and_verify_all_chunks
 ###nvm_write_read_all_sectors
 
