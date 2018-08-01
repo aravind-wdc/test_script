@@ -1,0 +1,28 @@
+diff --git a/include/liblightnvm_spec.h b/include/liblightnvm_spec.h
+index 0aaf968..8503047 100644
+--- a/include/liblightnvm_spec.h
++++ b/include/liblightnvm_spec.h
+@@ -102,7 +102,8 @@ enum nvm_spec_20_opcodes {
+ };
+ 
+ enum nvm_spec_opcodes {
+-	NVM_OPC_IDFY = 0xE2,
++	//NVM_OPC_IDFY = 0xE2,
++	NVM_OPC_IDFY = 0x0E, //Temp fix as 0xE2 is already in use in the WDC FW.
+ 
+ 	NVM_OPC_RPRT = 0x02,
+ 
+diff --git a/src/nvm_be_ioctl.c b/src/nvm_be_ioctl.c
+index 5fbd523..5a06603 100644
+--- a/src/nvm_be_ioctl.c
++++ b/src/nvm_be_ioctl.c
+@@ -250,7 +250,8 @@ struct nvm_spec_rprt *nvm_be_ioctl_rprt(struct nvm_dev *dev,
+ 
+ 		uint64_t lpo = lpo_off + i * descr_len;
+ 
+-		cmd.cdw10 = 0xCA | (numdl << 16);
++		//cmd.cdw10 = 0xCA | (numdl << 16);
++		cmd.cdw10 = 0xCF | (numdl << 16); // Temp fix, as 0xCA is already in use in WDC FW
+ 		cmd.cdw11 = numdu;
+ 		cmd.cdw12 = lpo;
+ 		cmd.cdw13 = (lpo >> 32);

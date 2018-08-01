@@ -3,10 +3,10 @@
 
 usage()
 {
-	echo "Usage: Pass the ocssd nvme device path, ex: /dev/nvme0n1"
+	echo "Usage: Pass the ocssd nvme device path and device type. ex: ./ocssd_test_suite.sh /dev/nvme0n1 qssd "
 	echo "Ensure liblightnvm is installed."
-	echo "Run as sudo ocssd_test_suite.sh <dev path>"
-
+	echo "Run as sudo ocssd_basic_test.sh <dev_path> <qssd/pssd> "
+	echo "qssd is qemu emulated ocssd, pssd is physical Ocssd"
 }
 
 # Run a command to ensure command succeeds
@@ -403,19 +403,32 @@ nvm_line_read_all_chunks()
 }
 get_liblightnvm()
 {
-echo "Doing git clone of liblightnvm master and compile it and use the binaries."
-if [ ! -d ./liblightnvm ]; then
-run_command "sudo git clone -b fix_lba https://github.com/OpenChannelSSD/liblightnvm.git"
-cd liblightnvm
-run_command "make configure"
-run_command "make"
-#cd build/cli
-#mkdir -p logs
-cd ..
-else
-	echo "Found existing liblightnvm !!!"
-fi
-
+    echo "Doing git clone of liblightnvm master and compile it and use the binaries."
+    if [ ! -d ./liblightnvm ]; then
+        run_command "sudo git clone -b fix_lba https://github.com/OpenChannelSSD/liblightnvm.git"
+    fi
+    echo "Found existing liblightnvm !!!"
+    cd liblightnvm
+    if [ "$1" == "pssd" ]; then
+		if [ ! -f ./patch_applied ]; then
+        	echo "Applying patch for pssd"
+        	sudo git apply ../ftl_patch.patch
+			sudo touch ./patch_applied
+			run_command "make configure"
+			run_command "make"
+		fi
+    elif [ "$1" == "qssd" ]; then
+		if [ -f ./patch_applied ]; then
+			echo "Removing the patch"
+			sudo git apply -R ../ftl_patch.patch
+			sudo rm -f ./patch_applied
+			run_command "make configure"
+			run_command "make"
+		fi
+    fi
+    #cd build/cli
+    #mkdir -p logs
+    cd ..
 }
 
 get_dev_geo()
@@ -439,7 +452,7 @@ echo "Starting unit tests for ocssd on device $1. This test deletes all data on 
 echo =======================================================================================================================================
 sleep 5 
 
-if [ $# -ne 1 ]; then
+if [ $# -ne 2 ]; then
 	usage
 	exit 1
 fi
@@ -456,7 +469,8 @@ echo "Creating a file of size 4K and 16M" > $logs/ocssd_sanity.log
 create_4k_file
 create_16M_file
 
-get_liblightnvm
+get_liblightnvm $2
+
 llnvm_path_be_lba="NVM_CLI_BE_ID=4 ./liblightnvm/build/cli"
 llnvm_path_be_ioctl="NVM_CLI_BE_ID=1 ./liblightnvm/build/cli"
 llnvm_path="./liblightnvm/build/cli"
