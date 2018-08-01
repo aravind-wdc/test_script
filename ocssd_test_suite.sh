@@ -7,7 +7,6 @@ usage()
 	echo "Ensure liblightnvm is installed."
 	echo "Run as sudo ocssd_basic_test.sh <dev_path> <qssd/pssd> "
 	echo "qssd is qemu emulated ocssd, pssd is physical Ocssd"
-
 }
 
 # Run a command to ensure command succeeds
