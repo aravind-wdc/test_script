@@ -9,6 +9,6 @@ https://github.com/bvanassche/fio
 It expects the "nvme" binary is available in the system. (sudo apt-get install nvme-cli)
 
 Usage:
-./ocssd_test_suite.sh /dev/nvme0n1 
+./ocssd_test_suite.sh /dev/nvme0n1 <qssd/pssd>
 
 ./run_fio /dev/nvme0n1 1g
